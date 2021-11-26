@@ -13,6 +13,7 @@ import Eventlog.Args (args, Args(..))
 import Eventlog.HtmlTemplate
 import Eventlog.Data
 import Eventlog.Types
+import Eventlog.Ticky
 
 main :: IO ()
 main = do
@@ -35,18 +36,22 @@ argsToOutput _ =
 
 doOneJson :: Args -> FilePath -> FilePath -> IO ()
 doOneJson a fin fout = do
-  (_, val, _, _) <- generateJson fin a
+  HeapProfile (_, val, _, _) <- generateJson fin a
   encodeFile fout val
 
 doOneHtml :: Args -> FilePath -> FilePath -> IO ()
 doOneHtml a fin fout = do
-  (header, data_json, descs, closure_descs) <- generateJsonValidate checkTraces fin a
-  let html = templateString header data_json descs closure_descs a
+  prof_type <- generateJsonValidate checkTraces fin a
+  let html = case prof_type of
+                HeapProfile (header, data_json, descs, closure_descs) ->
+                 templateString header data_json descs closure_descs a
+                TickyProfile (header, tallocs, ticked_per, dat) ->
+                  tickyTemplateString header tallocs ticked_per dat a
   writeFile fout html
   where
     checkTraces :: ProfData -> IO ()
-    checkTraces (ProfData _ _ _ _ ts _ _) =
-      if length ts > 1000
+    checkTraces dat =
+      if length (profTraces dat) > 1000
         then hPutStrLn stderr
               "More than 1000 traces, consider reducing using -i or -x"
         else return ()

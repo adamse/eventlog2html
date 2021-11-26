@@ -11,6 +11,7 @@ import GHC.RTS.Events (HeapProfBreakdown(..))
 import GHC.Exts.Heap.ClosureTypes
 import Numeric
 import qualified Data.Text as T
+import qualified Data.Map as Map
 
 data Header =
   Header
@@ -58,12 +59,24 @@ data HeapInfo = HeapInfo { heapSizeSamples :: [HeapSample]
                          } deriving Show
 
 data ProfData = ProfData { profHeader :: Header
-                         , profTotals :: (Map Bucket BucketInfo)
+                         , profTotals :: Map Bucket BucketInfo
                          , profCCMap  :: Map Word32 CostCentre
                          , profFrames :: [Frame]
                          , profTraces :: [Trace]
                          , profHeap   :: HeapInfo
-                         , profItl    :: Map InfoTablePtr InfoTableLoc } deriving Show
+                         , profItl    :: Map InfoTablePtr InfoTableLoc
+                         , profTickyCounters :: Map TickyCounterId TickyCounter
+                         , profTickySamples  :: [TickySample]
+                         , profTotalAllocations :: Word64
+                         } deriving Show
+
+newtype TickyCounterId = TickyCounterId Word64 deriving (Ord, Eq, Show)
+
+data TickyCounter = TickyCounter { tickyCtrId :: Word64, tickyCtrArity :: Word16, tickyCtrKinds :: Text, tickyCtrName :: Text, tickyCtrInfo :: InfoTablePtr }
+  deriving Show
+
+data TickySample = TickySample { tickyCtrSampleId, tickyCtrEntries, tickyCtrAllocs, tickyCtrAllocd :: Word64 }
+  deriving Show
 
 data InfoTableLoc = InfoTableLoc { itlName :: !Text
                                  , itlClosureDesc :: !ClosureType
@@ -84,3 +97,18 @@ toItblPointer (Bucket t) =
                 ((n, ""):_) -> n
                 _ -> error (show t)
     in InfoTablePtr w64
+
+data InfoTableLocStatus = None -- None of the entries have InfoTableLoc
+                        | Missing -- This one is just missing
+                        | Here InfoTableLoc -- Here is is
+
+mkMissing :: Maybe InfoTableLoc -> InfoTableLocStatus
+mkMissing = maybe Missing Here
+
+
+mkClosureInfo :: (k -> a -> InfoTablePtr)
+              -> Map.Map k a
+              -> Map.Map InfoTablePtr InfoTableLoc
+              -> Map.Map k (InfoTableLocStatus, a)
+mkClosureInfo f b ipes =
+  Map.mapWithKey (\k v -> (mkMissing $ Map.lookup (f k v) ipes, v)) b

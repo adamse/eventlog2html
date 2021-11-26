@@ -55,7 +55,8 @@ Library
     trie-simple          >= 0.4,
     hashable             >= 1.0,
     statistics-linreg    >= 0.3,
-    ghc-heap
+    ghc-heap,
+    raw-strings-qq
 
   GHC-options:         -Wall
   default-language:    Haskell2010
@@ -75,6 +76,7 @@ Library
                        Eventlog.VegaTemplate
                        Eventlog.AssetVersions
                        Eventlog.Detailed
+                       Eventlog.Ticky
   other-modules:       Paths_eventlog2html
   autogen-modules:     Paths_eventlog2html
 

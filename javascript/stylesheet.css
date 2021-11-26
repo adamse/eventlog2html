@@ -23,6 +23,10 @@ table, caption, tbody, tfoot, thead, tr, th, td {
     background: transparent;
 }
 
+th {
+  min-width: 60px;
+}
+
 .hoverflow {
   overflow: auto;
   width: 900px;
@@ -35,4 +39,15 @@ table, caption, tbody, tfoot, thead, tr, th, td {
 /* https://github.com/gwatts/jquery.sparkline/issues/202 */
 .jqstooltip {
   box-sizing: content-box;
+}
+
+.closureTable {
+width: 100%;
+}
+#table {
+width: 100%;
+}
+
+.cheader{
+  margin-left:10px;
 }
