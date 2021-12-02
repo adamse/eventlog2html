@@ -106,6 +106,7 @@ htmlHeader as =
         css "https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic"
         jsScript fancyTableURL
         css "https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css"
+        css "https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css"
         jsScript "https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"
         jsScript "https://cdn.datatables.net/plug-ins/1.11.3/dataRender/ellipsis.js"
         jsScript "https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"
@@ -265,7 +266,12 @@ initTable ipe =
         "autoWidth": true,
         "dom": 'Bfrtip',
         "buttons": [
-            'csv'
+            {
+                text: 'TSV',
+                extend: 'csvHtml5',
+                fieldSeparator: '\t',
+                extension: '.tsv'
+            }
         ],
         "columnDefs": [
           { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [7,8,9,10,11] : [ 2,3,4,5,6])}
