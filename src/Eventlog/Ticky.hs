@@ -107,6 +107,7 @@ htmlHeader as =
         jsScript fancyTableURL
         css "https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css"
         jsScript "https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"
+        jsScript "https://cdn.datatables.net/plug-ins/1.11.3/dataRender/ellipsis.js"
         jsScript sparklinesURL
     -- Include this last to overwrite some milligram styling
     H.style $ preEscapedToHtml stylesheet
@@ -244,7 +245,7 @@ initTable ipe =
     $('.closureTable tfoot th').each( function () {
         var title = $(this).text();
         if (! ($(this).data("sortas") == "numeric")){
-          $(this).html( '<input type="text" placeholder="Search ' + title + '"/>' );
+          $(this).html( '<input type="text" style="width:100%"; placeholder="Search"/>' );
         }
         else {
           $(this).html('')
@@ -257,6 +258,7 @@ initTable ipe =
         "autoWidth": true,
         "columnDefs": [
           { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [7,8,9,10,11] : [ 2,3,4,5,6])}
+          , {"render": $.fn.dataTable.render.ellipsis( 30, true, false ), "targets": (ipe ? [4] : []) }
           ],
 
         "deferRender" : true,

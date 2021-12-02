@@ -10,7 +10,8 @@
   color: black;
 }
 .container { width: 90%;
-             max-width: 1400px; }
+           ; max-width: 90%;
+           }
 
 /* Reset milligram table styling so tooltips render correctly */
 table, caption, tbody, tfoot, thead, tr, th, td {
