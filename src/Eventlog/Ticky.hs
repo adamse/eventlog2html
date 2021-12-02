@@ -85,17 +85,18 @@ htmlHeader :: Args -> Html
 htmlHeader as =
     H.head $ do
     H.title "eventlog2html - Ticky Profile"
-    meta ! charset "UTF-8"
+    meta ! charset "utf-8"
     if not (noIncludejs as)
       then do
-        script $ preEscapedToHtml vegaLite
-        script $ preEscapedToHtml vega
-        script $ preEscapedToHtml vegaEmbed
         script $ preEscapedToHtml jquery
         H.style  $ preEscapedToHtml bootstrapCSS
         script $ preEscapedToHtml bootstrap
-        script $ preEscapedToHtml fancytable
-        script $ preEscapedToHtml sparkline
+        H.style  $ preEscapedToHtml datatablesCSS
+        H.style  $ preEscapedToHtml datatablesButtonsCSS
+        script $ preEscapedToHtml datatables
+        script $ preEscapedToHtml datatablesButtons
+        script $ preEscapedToHtml datatablesHtml5
+        H.style $ preEscapedToHtml imagesCSS
       else do
         jsScript vegaURL
         jsScript vegaLiteURL
@@ -105,15 +106,13 @@ htmlHeader as =
         jsScript bootstrapURL
         css "https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic"
         jsScript fancyTableURL
-        css "https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css"
-        css "https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css"
-        jsScript "https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"
-        jsScript "https://cdn.datatables.net/plug-ins/1.11.3/dataRender/ellipsis.js"
-        jsScript "https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"
-        jsScript "https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"
-        jsScript "https://cdn.datatables.net/buttons/2.0.1/js/buttons.print.min.js"
-        jsScript sparklinesURL
-    -- Include this last to overwrite some milligram styling
+        css (preEscapedStringValue datatablesCSSURL)
+        css (preEscapedStringValue datatablesButtonsCSSURL)
+        jsScript datatablesURL
+        jsScript datatablesButtonsURL
+        jsScript datatablesButtonsHTML5URL
+    script $ preEscapedToHtml datatablesEllipsis
+    -- Include this last to overwrite other styling
     H.style $ preEscapedToHtml stylesheet
 
 
@@ -196,7 +195,7 @@ renderTickyInfo with_ipe ticky_samples = do
     renderInfoTableLoc (InfoTableLoc table_name cd tydesc _lbl m sloc) = do
       H.td (toHtml table_name)
       H.td (toHtml (show @ClosureType cd))
-      H.td (toHtml tydesc)
+      H.td (preEscapedToHtml tydesc) -- Don't escape this as the ellipsis plugin does it.
       H.td (toHtml m)
       H.td (toHtml sloc)
 
@@ -274,7 +273,7 @@ initTable ipe =
             }
         ],
         "columnDefs": [
-          { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [7,8,9,10,11] : [ 2,3,4,5,6])}
+          { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [7,8,9,10,11,12] : [ 2,3,4,5,6,7])}
           , {"render": $.fn.dataTable.render.ellipsis( 30, true, false ), "targets": (ipe ? [4] : []) }
           ],
 
