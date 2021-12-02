@@ -185,6 +185,7 @@ renderTickyInfo with_ipe ticky_samples = do
       numTh "Allocd"
       numTh "Entries"
       numTh "Allocs/Entries"
+      numTh "Allocd/Entries"
     numTh lbl = H.th ! H.dataAttribute "sortas" "numeric" $ lbl
 
     renderInfoTableLoc :: InfoTableLoc -> Html
@@ -225,6 +226,9 @@ renderTickyInfo with_ipe ticky_samples = do
             H.td (toHtml (case entries of
                             0 -> 0
                             _ -> allocs `Prelude.div` entries))
+            H.td (toHtml (render (trunc (case entries of
+                            0 -> 0
+                            _ -> realToFrac allocd / realToFrac entries))))
 
 
 
