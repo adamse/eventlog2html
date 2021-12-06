@@ -40,7 +40,8 @@ import Text.Blaze.Html5 as H
       title,
       tr )
 import Text.Blaze.Html5.Attributes as A
-    ( charset, class_, hidden, href, id, onclick, rel, src )
+    ( charset, class_, hidden, href, id, onclick, rel, src)
+import Text.Blaze (customAttribute)
 import Text.Blaze.Html.Renderer.String
 
 import Eventlog.Javascript
@@ -52,6 +53,10 @@ import Text.RawString.QQ
 import Data.Fixed
 import Control.Monad
 
+import Debug.Trace
+import Data.List (foldl', sortBy)
+import Data.Ord
+
 renderTicky :: Word64 -> Map.Map TickyCounterId TickyCounter
                       -> Map.Map InfoTablePtr InfoTableLoc
                       -> [TickySample] -> (Double, Html)
@@ -60,20 +65,26 @@ renderTicky total_allocs counters ipes samples = (percentage_ticked, renderTicky
     percentage_ticked = realToFrac (sum (Map.map allocs accum_samples)) / realToFrac total_allocs
     joined_with_ipe   = mkClosureInfo (\_ (v, _, _) -> tickyCtrInfo v) joined_data ipes
 
-    joined_data   = Map.mergeWithKey (\_ b c -> Just (b, c, realToFrac (allocs c) / realToFrac total_allocs)) (const mempty) (const mempty) counters accum_samples
+    joined_data   = traceShow counters $ Map.mergeWithKey (\_ b c -> Just (b, c, realToFrac (allocs c) / realToFrac total_allocs)) (const mempty) (const mempty) counters accum_samples
     accum_samples = accumulateSamples samples
 
 
-data AccumStats = AccumStats { entries :: !Word64, allocs :: !Word64, allocd :: !Word64 } deriving Show
+data AccumStats = AccumStats { entries :: !Word64, allocs :: !Word64, allocd :: !Word64, series :: ![(Double, Word64 {- allocd -},   Word64 {- entries -})] } deriving Show
 
-instance Semigroup AccumStats where
-  (<>) (AccumStats a b c) (AccumStats d e f) = AccumStats (a + d) (b + e) (c + f)
+emptyAccumStats :: AccumStats
+emptyAccumStats = AccumStats 0 0 0 []
 
-instance Monoid AccumStats where
-  mempty = AccumStats 0 0 0
+insertSample :: TickySample -> AccumStats -> AccumStats
+insertSample (TickySample _ids entries allocs allocd time) (AccumStats aentries aalloc aallocd aseries ) =
+  (AccumStats (aentries + entries) (aalloc + allocs) (allocd + aallocd) ((time, allocd + aallocd, aentries + entries ) : aseries))
+
+initStats :: TickySample -> AccumStats
+initStats = flip insertSample emptyAccumStats
 
 accumulateSamples ::  [TickySample] -> Map.Map TickyCounterId AccumStats
-accumulateSamples samples = Map.fromListWith (<>) [(TickyCounterId a, AccumStats b c d) | TickySample a b c d <- samples]
+accumulateSamples samples =
+  foldl' (\smap ts -> Map.insertWith (\_new old -> insertSample ts old) (TickyCounterId $ tickyCtrSampleId ts) (initStats ts) smap) Map.empty
+  (sortBy (comparing tickySampleTime) samples)
 
 
 jsScript :: String -> Html
@@ -97,6 +108,7 @@ htmlHeader as =
         script $ preEscapedToHtml datatablesButtons
         script $ preEscapedToHtml datatablesHtml5
         H.style $ preEscapedToHtml imagesCSS
+        script $ preEscapedToHtml sparkline
       else do
         jsScript vegaURL
         jsScript vegaLiteURL
@@ -111,6 +123,7 @@ htmlHeader as =
         jsScript datatablesURL
         jsScript datatablesButtonsURL
         jsScript datatablesButtonsHTML5URL
+        jsScript sparklinesURL
     script $ preEscapedToHtml datatablesEllipsis
     -- Include this last to overwrite other styling
     H.style $ preEscapedToHtml stylesheet
@@ -189,6 +202,7 @@ renderTickyInfo with_ipe ticky_samples = do
       numTh "Entries"
       numTh "Allocs/Entries"
       numTh "Allocd/Entries"
+      numTh "Chart"
     numTh lbl = H.th ! H.dataAttribute "sortas" "numeric" $ lbl
 
     renderInfoTableLoc :: InfoTableLoc -> Html
@@ -232,16 +246,18 @@ renderTickyInfo with_ipe ticky_samples = do
             H.td (toHtml (render (trunc (case entries of
                             0 -> 0
                             _ -> realToFrac allocd / realToFrac entries))))
+            H.td (toHtml (renderSpark series))
 
 
 
-{-
-renderSpark :: [(Double, Double)] -> Html
-renderSpark vs = H.span ! A.class_ "linechart" $ toHtml (T.intercalate "," (map renderLine vs))
+renderSpark :: [(Double, Word64, Word64)] -> Html
+renderSpark vs = H.span ! A.class_ "linechart"
+  ! customAttribute "data-allocd" (H.preEscapedTextValue $ T.intercalate "," (map renderLine vs))
+  ! customAttribute "data-entries" (H.preEscapedTextValue $ T.intercalate "," (map renderLineEntries vs)) $ mempty
   where
     rdouble = T.pack . showFixed True . realToFrac @Double @(Fixed E2)
-    renderLine (x,y) = rdouble x <> ":" <> rdouble y
-    -}
+    renderLine (x,w, _) = rdouble x <> ":" <> T.pack (show w)
+    renderLineEntries (x,_, e) = rdouble x <> ":" <> T.pack (show e)
 
 initTable :: Bool -> T.Text
 initTable ipe =
@@ -290,9 +306,17 @@ initTable ipe =
                             .draw();
                     }
                 } );
+        $.fn.sparkline.defaults.common.chartRangeMin = 0;
+        $.fn.sparkline.defaults.common.width = 200;
+        $('.linechart').sparkline()
             } );
         }
     });
+    table.on( 'draw', function () {
+      $('.linechart').sparkline('html', { enableTagOptions: true,  tagValuesAttribute: 'data-allocd' });
+      $('.linechart').sparkline('html', { composite: true, lineColor: 'red', enableTagOptions: true, tagValuesAttribute: 'data-entries' });
+      $.sparkline_display_visible();
+    } );
     })
     |]
 

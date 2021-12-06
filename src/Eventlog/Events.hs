@@ -32,6 +32,7 @@ import System.IO
 import qualified Data.Trie.Map as Trie
 import Data.Map.Merge.Lazy
 import Data.Functor.Identity
+import Debug.Trace
 
 type PartialHeader = Int -> Header
 
@@ -211,7 +212,7 @@ folder a el (Event t e _) = el &
       HeapLive _ b -> addHeapLive t b
       BlocksSize _ b -> addBlocksSize t b
       TickyCounterDef defid arity kinds name tid -> addTickyDef defid arity kinds name tid
-      TickyCounterSample defid entries allocs allocd -> addTickySample defid entries allocs allocd
+      TickyCounterSample defid entries allocs allocd -> addTickySample t defid entries allocs allocd
 
       HeapAllocated cp alloc_bytes -> addHeapAllocated cp alloc_bytes
       _ -> id
@@ -275,8 +276,8 @@ addBlocksSize t s el = el { blocksSize = HeapSample (fromNano t) s : blocksSize 
 addTickyDef :: Word64 -> Word16 -> Text -> Text -> Word64 ->  EL -> EL
 addTickyDef a b c d e el = el { ticky_counter = TickyCounter a b c d (InfoTablePtr e) : ticky_counter el }
 
-addTickySample :: Word64 -> Word64 -> Word64 -> Word64 -> EL -> EL
-addTickySample a b c d el = el { ticky_samples = TickySample a b c d : ticky_samples el }
+addTickySample :: Timestamp -> Word64 -> Word64 -> Word64 -> Word64 -> EL -> EL
+addTickySample t a b c d el = el { ticky_samples = TickySample a b c d (fromNano t) : ticky_samples el }
 
 
 -- | Decide whether to include a trace based on the "includes" and

@@ -75,7 +75,7 @@ newtype TickyCounterId = TickyCounterId Word64 deriving (Ord, Eq, Show)
 data TickyCounter = TickyCounter { tickyCtrId :: Word64, tickyCtrArity :: Word16, tickyCtrKinds :: Text, tickyCtrName :: Text, tickyCtrInfo :: InfoTablePtr }
   deriving Show
 
-data TickySample = TickySample { tickyCtrSampleId, tickyCtrEntries, tickyCtrAllocs, tickyCtrAllocd :: Word64 }
+data TickySample = TickySample { tickyCtrSampleId, tickyCtrEntries, tickyCtrAllocs, tickyCtrAllocd :: Word64, tickySampleTime :: Double }
   deriving Show
 
 data InfoTableLoc = InfoTableLoc { itlName :: !Text
