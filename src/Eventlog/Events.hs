@@ -32,7 +32,11 @@ import System.IO
 import qualified Data.Trie.Map as Trie
 import Data.Map.Merge.Lazy
 import Data.Functor.Identity
+import qualified Data.Text.Lazy.Encoding as TE
+import qualified Data.Text.Lazy as TL
+import Data.Aeson
 import Debug.Trace
+
 
 type PartialHeader = Int -> Header
 
@@ -274,7 +278,10 @@ addBlocksSize :: Timestamp -> Word64 -> EL -> EL
 addBlocksSize t s el = el { blocksSize = HeapSample (fromNano t) s : blocksSize el}
 
 addTickyDef :: Word64 -> Word16 -> Text -> Text -> Word64 ->  EL -> EL
-addTickyDef a b c d e el = el { ticky_counter = TickyCounter a b c d (InfoTablePtr e) : ticky_counter el }
+addTickyDef a b c d e el =
+  case decode (TE.encodeUtf8 (TL.fromStrict c)) of
+    Just ptrs -> el { ticky_counter = TickyCounter a b ptrs d (InfoTablePtr e) : ticky_counter el }
+    Nothing   -> el
 
 addTickySample :: Timestamp -> Word64 -> Word64 -> Word64 -> Word64 -> EL -> EL
 addTickySample t a b c d el = el { ticky_samples = TickySample a b c d (fromNano t) : ticky_samples el }

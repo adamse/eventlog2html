@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Eventlog.Types(module Eventlog.Types, HeapProfBreakdown(..), ClosureType) where
 
 import Data.Text (Text)
@@ -72,7 +73,18 @@ data ProfData = ProfData { profHeader :: Header
 
 newtype TickyCounterId = TickyCounterId Word64 deriving (Ord, Eq, Show)
 
-data TickyCounter = TickyCounter { tickyCtrId :: Word64, tickyCtrArity :: Word16, tickyCtrKinds :: Text, tickyCtrName :: Text, tickyCtrInfo :: InfoTablePtr }
+data TickyCounterArgs = TickyCounterArgs { tickyCounterType :: Text
+                                         , tickyCounterFVs  :: [Char]
+                                         , tickyCounterArgs :: [Char]
+                                         } deriving Show
+
+instance FromJSON TickyCounterArgs where
+  parseJSON = withObject "TickyCounterArgs" $ \v -> TickyCounterArgs
+                <$> v .: "type"
+                <*> (T.unpack <$> v .: "fvs")
+                <*> (T.unpack <$> v .: "args")
+
+data TickyCounter = TickyCounter { tickyCtrId :: Word64, tickyCtrArity :: Word16, tickyCtrArgs :: TickyCounterArgs , tickyCtrName :: Text, tickyCtrInfo :: InfoTablePtr }
   deriving Show
 
 data TickySample = TickySample { tickyCtrSampleId, tickyCtrEntries, tickyCtrAllocs, tickyCtrAllocd :: Word64, tickySampleTime :: Double }

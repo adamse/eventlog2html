@@ -189,7 +189,8 @@ renderTickyInfo with_ipe ticky_samples = do
   where
     headFoot = do
       H.th "Label"
-      H.th "Arguments"
+      H.th "FVs"
+      H.th "Args"
       when (with_ipe) $ do
         H.th "Description"
         H.th "CTy"
@@ -199,9 +200,10 @@ renderTickyInfo with_ipe ticky_samples = do
       numTh "Allocs"
       numTh "Allocs (%)"
       numTh "Allocd"
+      numTh "Allocd #"
       numTh "Entries"
       numTh "Allocs/Entries"
-      numTh "Allocd/Entries"
+      numTh "Allocd #/Entries"
       numTh "Chart"
     numTh lbl = H.th ! H.dataAttribute "sortas" "numeric" $ lbl
 
@@ -215,11 +217,11 @@ renderTickyInfo with_ipe ticky_samples = do
 
 
     renderInfoTableLocStatus :: InfoTableLocStatus -> Html
+    renderInfoTableLocStatus _ | not with_ipe = mempty
     renderInfoTableLocStatus itls =
       case itls of
         Here itl -> renderInfoTableLoc itl
         Missing  -> emptyItlColumns
-        None     -> mempty
 
     emptyItlColumns = do
       H.td ""
@@ -231,33 +233,52 @@ renderTickyInfo with_ipe ticky_samples = do
 
     renderEntry :: (InfoTableLocStatus, (TickyCounter, AccumStats, Double)) -> Html
     renderEntry (loc, ((TickyCounter _id _arity kinds label _), AccumStats {..}, percent)) = do
-          H.tr $ do
+      let fvs = tickyCounterFVs kinds
+          args = tickyCounterArgs kinds
+          size = closureSize (length fvs) (length args)
+          alloc_no = fromIntegral allocd `Prelude.div` size
+      H.tr $ do
 --            H.td (renderSpark (getBandValues n (ts, bs)))
             H.td (toHtml label)
-            H.td (toHtml kinds)
+            H.td (toHtml fvs)
+            H.td (toHtml args)
             renderInfoTableLocStatus loc
             H.td (toHtml allocs)
             H.td (toHtml $ render $ trunc (percent * 100))
             H.td (toHtml allocd)
+            H.td (toHtml alloc_no)
             H.td (toHtml entries)
             H.td (toHtml (case entries of
                             0 -> 0
                             _ -> allocs `Prelude.div` entries))
             H.td (toHtml (render (trunc (case entries of
                             0 -> 0
-                            _ -> realToFrac allocd / realToFrac entries))))
-            H.td (toHtml (renderSpark series))
+                            _ -> realToFrac alloc_no / realToFrac entries))))
+            H.td (if null args then (toHtml (renderSpark size series)) else mempty)
+
+closureSize :: Int -> Int -> Int
+closureSize fvs args
+  -- THUNK, HEADER = 2
+  | args == 0 = (2 + fvs) * 8
+  | otherwise  = (1 + fvs) * 8
 
 
 
-renderSpark :: [(Double, Word64, Word64)] -> Html
-renderSpark vs = H.span ! A.class_ "linechart"
+
+
+renderSpark :: Int -> [(Double, Word64, Word64)] -> Html
+renderSpark size vs = H.span ! A.class_ "linechart"
   ! customAttribute "data-allocd" (H.preEscapedTextValue $ T.intercalate "," (map renderLine vs))
-  ! customAttribute "data-entries" (H.preEscapedTextValue $ T.intercalate "," (map renderLineEntries vs)) $ mempty
+  ! customAttribute "data-entries" (H.preEscapedTextValue $ T.intercalate "," (map renderLineEntries vs))
+  ! customAttribute "sparkChartRangeMax" (H.toValue max_alloc_n)
+  $ mempty
   where
     rdouble = T.pack . showFixed True . realToFrac @Double @(Fixed E2)
-    renderLine (x,w, _) = rdouble x <> ":" <> T.pack (show w)
+    renderLine (x,w, _) = rdouble x <> ":" <> T.pack (show (w `Prelude.div` fromIntegral size))
     renderLineEntries (x,_, e) = rdouble x <> ":" <> T.pack (show e)
+
+    max_alloc_n = last_allocd `Prelude.div` (fromIntegral size)
+    (_, last_allocd, _) = Prelude.head vs
 
 initTable :: Bool -> T.Text
 initTable ipe =
@@ -275,9 +296,16 @@ initTable ipe =
         }
     } );
 
+    function init_spark(){
+
+      $('.linechart').sparkline('html', { enableTagOptions: true, tagOptionPrefix: 'allocd-',  tagValuesAttribute: 'data-allocd' });
+      $('.linechart').sparkline('html', { composite: true, lineColor: 'red', enableTagOptions: true, tagOptionPrefix: 'entries-', tagValuesAttribute: 'data-entries' });
+      $.sparkline_display_visible();
+    }
+
     // DataTable
     var table = $('.closureTable').DataTable({
-        "order": [[ ipe ? 7 : 2, "desc" ]],
+        "order": [[ ipe ? 8 : 3, "desc" ]],
         "autoWidth": true,
         "dom": 'Bfrtip',
         "buttons": [
@@ -289,8 +317,8 @@ initTable ipe =
             }
         ],
         "columnDefs": [
-          { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [7,8,9,10,11,12] : [ 2,3,4,5,6,7])}
-          , {"render": $.fn.dataTable.render.ellipsis( 30, true, false ), "targets": (ipe ? [4] : []) }
+          { "orderSequence": ["desc", "asc"],  "targets": (ipe ? [8,9,10,11,12,13,14] : [ 3,4,5,6,7,8,9])}
+          , {"render": $.fn.dataTable.render.ellipsis( 30, true, false ), "targets": (ipe ? [5] : []) }
           ],
 
         "deferRender" : true,
@@ -299,7 +327,7 @@ initTable ipe =
             $(".closureTable").removeAttr("hidden");
             this.api().columns().every( function () {
                 var that = this;
-                $( 'input', this.footer() ).on( 'keyup change clear', function () {
+                $( 'input', this.footer() ).on( 'blur', function () {
                     if ( that.search() !== this.value ) {
                         that
                             .search( this.value )
@@ -308,14 +336,12 @@ initTable ipe =
                 } );
         $.fn.sparkline.defaults.common.chartRangeMin = 0;
         $.fn.sparkline.defaults.common.width = 200;
-        $('.linechart').sparkline()
+        init_spark();
             } );
         }
     });
     table.on( 'draw', function () {
-      $('.linechart').sparkline('html', { enableTagOptions: true,  tagValuesAttribute: 'data-allocd' });
-      $('.linechart').sparkline('html', { composite: true, lineColor: 'red', enableTagOptions: true, tagValuesAttribute: 'data-entries' });
-      $.sparkline_display_visible();
+        init_spark();
     } );
     })
     |]
