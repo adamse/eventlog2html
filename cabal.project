@@ -4,4 +4,4 @@ packages: .
 source-repository-package
       type: git
       location: git@github.com:mpickering/ghc-events.git
-      tag: 06de49bbb627d6685be77d96c1bc963f03faf9b6
+      tag: 8046b8245d74fa02067410b65141947607506870
